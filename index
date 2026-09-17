@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memory-Loss Tic-Tac-Toe</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-x: #38bdf8;
+      --accent-o: #f43f5e;
+      --border-color: #334155;
+      --hover-bg: #334155;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .game-container {
+      background-color: var(--card-bg);
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-width: 420px;
+      width: 100%;
+    }
+
+    h1 { font-size: 1.6rem; margin-bottom: 6px; text-align: center; }
+    .tagline { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px; font-style: italic; text-align: center; }
+
+    .mode-select { display: flex; gap: 10px; margin-bottom: 16px; width: 100%; }
+
+    .btn {
+      flex: 1; padding: 9px 12px; border: 1px solid var(--border-color);
+      background-color: transparent; color: var(--text-muted); border-radius: 8px;
+      cursor: pointer; font-weight: 600; transition: all 0.2s ease;
+    }
+
+    .btn.active, .btn:hover { background-color: var(--hover-bg); color: var(--text-main); border-color: var(--text-muted); }
+
+    .status-panel { font-size: 1.05rem; margin-bottom: 6px; text-align: center; font-weight: 600; min-height: 26px; }
+    .sub-hint { font-size: 0.8rem; color: #fbbf24; margin-bottom: 16px; text-align: center; min-height: 20px; }
+
+    .status-panel span.x { color: var(--accent-x); }
+    .status-panel span.o { color: var(--accent-o); }
+
+    .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; aspect-ratio: 1 / 1; margin-bottom: 20px; }
+
+    .cell {
+      background-color: #0f172a; border: 2px solid var(--border-color); border-radius: 12px;
+      display: flex; justify-content: center; align-items: center; font-size: 2.4rem;
+      cursor: pointer; transition: all 0.15s ease; user-select: none;
+    }
+
+    .cell:hover:not(.taken) { background-color: var(--hover-bg); border-color: #64748b; }
+    .cell.x { color: var(--accent-x); cursor: default; }
+    .cell.o { color: var(--accent-o); cursor: default; }
+
+    .cell.oldest {
+      opacity: 0.35; filter: grayscale(50%);
+      animation: blinkOldest 0.8s infinite ease-in-out;
+    }
+
+    @keyframes blinkOldest {
+      0%, 100% { opacity: 0.2; transform: scale(0.92); }
+      50% { opacity: 0.6; transform: scale(1.02); }
+    }
+
+    .cell.winner {
+      background-color: #312e81; border-color: #818cf8; opacity: 1 !important;
+      animation: pulse 1s infinite alternate;
+    }
+
+    @keyframes pulse { from { transform: scale(0.98); } to { transform: scale(1.02); } }
+
+    .score-board {
+      display: flex; justify-content: space-between; width: 100%; margin-bottom: 16px;
+      font-size: 0.85rem; color: var(--text-muted); background-color: #0f172a; padding: 10px 16px; border-radius: 8px;
+    }
+
+    .score-item { text-align: center; }
+    .score-num { display: block; font-size: 1.15rem; font-weight: bold; color: var(--text-main); }
+
+    .reset-btn {
+      width: 100%; padding: 12px; background-color: #38bdf8; color: #0f172a; border: none;
+      border-radius: 8px; font-size: 0.95rem; font-weight: 700; cursor: pointer; transition: opacity 0.2s ease;
+    }
+    .reset-btn:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+
+  <div class="game-container">
+    <h1>Memory-Loss Tic-Tac-Toe</h1>
+    <div class="tagline">Because regular Tic-Tac-Toe lasts way too long.</div>
+
+    <div class="mode-select">
+      <button class="btn active" id="pvp-btn" onclick="setMode('pvp')">2 Players</button>
+      <button class="btn" id="ai-btn" onclick="setMode('ai')">vs Smug AI</button>
+    </div>
+
+    <div class="score-board">
+      <div class="score-item">🐱 Cat<span id="score-x" class="score-num">0</span></div>
+      <div class="score-item">Active Baggage<span id="active-pieces" class="score-num">0 / 6</span></div>
+      <div class="score-item" id="player2-label">🔴 Laser<span id="score-o" class="score-num">0</span></div>
+    </div>
+
+    <div class="status-panel" id="status-text">Cat's Turn to make poor life choices</div>
+    <div class="sub-hint" id="sub-hint">The flashing piece is about to fade out of existence. F.</div>
+
+    <div class="board" id="board">
+      <div class="cell" data-index="0"></div>
+      <div class="cell" data-index="1"></div>
+      <div class="cell" data-index="2"></div>
+      <div class="cell" data-index="3"></div>
+      <div class="cell" data-index="4"></div>
+      <div class="cell" data-index="5"></div>
+      <div class="cell" data-index="6"></div>
+      <div class="cell" data-index="7"></div>
+      <div class="cell" data-index="8"></div>
+    </div>
+
+    <button class="reset-btn" onclick="restartGame()">Blame RNG and Restart</button>
+  </div>
+
+  <script>
+    let board = ["", "", "", "", "", "", "", "", ""];
+    let currentPlayer = "X";
+    let isGameActive = true;
+    let gameMode = "pvp";
+
+    const playerMoves = { X: [], O: [] };
+    const scores = { X: 0, O: 0 };
+    const winningConditions = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    
+    const symbols = { X: "🐱", O: "🔴" };
+    const playerNames = { X: "Cat", O: "Laser" };
+
+    const cells = document.querySelectorAll(".cell");
+    const statusText = document.getElementById("status-text");
+    const subHint = document.getElementById("sub-hint");
+
+    // Built-in Web Audio Synthesizer with sound effects
+    function playSound(type) {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        if (type === 'click') {
+          osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.08);
+          gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.08);
+        } else if (type === 'fade') {
+          // Sad descending tone when a piece disappears
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.2);
+          gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.2);
+        } else if (type === 'tease') {
+          // Cheeky playful two-tone tease for the AI move
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+          osc.frequency.setValueAtTime(554.37, audioCtx.currentTime + 0.08); // C#5
+          osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.16); // E5
+          gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.25);
+        } else if (type === 'win') {
+          // Happy upbeat victory chime
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
+          osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); 
+          osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2); 
+          gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.35);
+        }
+      } catch (e) {
+        // Audio context safety catch
+      }
+    }
+
+    cells.forEach(cell => cell.addEventListener("click", handleCellClick));
+
+    function setMode(mode) {
+      gameMode = mode;
+      document.getElementById("pvp-btn").classList.toggle("active", mode === "pvp");
+      document.getElementById("ai-btn").classList.toggle("active", mode === "ai");
+      playerNames.O = mode === "ai" ? "Smug AI" : "Laser";
+      document.getElementById("player2-label").childNodes[0].nodeValue = mode === "ai" ? "🤖 Smug AI" : "🔴 Laser";
+      resetAll();
+    }
+
+    function handleCellClick(e) {
+      if (!isGameActive) return;
+      if (gameMode === "ai" && currentPlayer === "O") return;
+      const idx = parseInt(e.target.getAttribute("data-index"));
+      if (board[idx] !== "") return;
+      executeTurn(idx, currentPlayer);
+    }
+
+    function executeTurn(index, player) {
+      if (playerMoves[player].length >= 3) {
+        const oldestIdx = playerMoves[player].shift();
+        board[oldestIdx] = "";
+        playSound('fade'); 
+      }
+
+      board[index] = player;
+      playerMoves[player].push(index);
+      
+      // Play tease sound if AI makes a move, otherwise standard click
+      if (gameMode === "ai" && player === "O") {
+        playSound('tease');
+      } else {
+        playSound('click');
+      }
+
+      renderBoard();
+
+      const winData = checkWinner(board);
+      if (winData) {
+        handleWin(winData);
+        return;
+      }
+
+      currentPlayer = currentPlayer === "X" ? "O" : "X";
+      updateFlavorText(currentPlayer);
+      document.getElementById("active-pieces").innerText = `${playerMoves.X.length + playerMoves.O.length} / 6`;
+
+      if (gameMode === "ai" && currentPlayer === "O" && isGameActive) {
+        subHint.innerText = "Smug AI is calculating your inevitable doom...";
+        setTimeout(aiTurn, 500);
+      }
+    }
+
+    function updateFlavorText(player) {
+      const name = playerNames[player];
+      const roasts = [
+        `That move was legally questionable, ${name}.`,
+        `Your oldest piece is sweating right now, ${name}.`,
+        `Bold strategy, ${name}. Let's see if it pays off.`,
+        `${name}'s turn. Try not to cry.`
+      ];
+      statusText.innerHTML = `${name} (${symbols[player]})'s Turn`;
+      if (playerMoves[player].length === 2) {
+        subHint.innerText = "⚠️ Warning: Your next move will delete your oldest piece!";
+      } else {
+        subHint.innerText = roasts[Math.floor(Math.random() * roasts.length)];
+      }
+    }
+
+    function renderBoard() {
+      cells.forEach((cell, i) => {
+        cell.innerText = board[i] ? symbols[board[i]] : "";
+        cell.className = "cell";
+        if (board[i]) {
+          cell.classList.add(board[i].toLowerCase(), "taken");
+        }
+      });
+
+      ['X', 'O'].forEach(player => {
+        if (playerMoves[player].length === 3) {
+          const oldestIdx = playerMoves[player][0];
+          cells[oldestIdx].classList.add("oldest");
+        }
+      });
+    }
+
+    function checkWinner(b) {
+      for (let combo of winningConditions) {
+        const [x, y, z] = combo;
+        if (b[x] && b[x] === b[y] && b[x] === b[z]) {
+          return { player: b[x], combo };
+        }
+      }
+      return null;
+    }
+
+    function handleWin(winData) {
+      isGameActive = false;
+      winData.combo.forEach(idx => cells[idx].classList.add("winner"));
+      const winnerName = playerNames[winData.player];
+      statusText.innerHTML = `🎉 ${winnerName} Wins! Friendship ended.`;
+      
+      playSound('win'); 
+
+      if (gameMode === "ai" && winData.player === "O") {
+        subHint.innerText = "AI is taking over. Start practicing your robot-appeasement bowing.";
+      } else if (gameMode === "ai" && winData.player === "X") {
+        subHint.innerText = "You beat the AI! Humanity is safe... for now.";
+      } else {
+        subHint.innerText = "The loser owes the winner coffee hihi.";
+      }
+
+      scores[winData.player]++;
+      document.getElementById("score-x").innerText = scores.X;
+      document.getElementById("score-o").innerText = scores.O;
+    }
+
+    function restartGame() {
+      board = ["", "", "", "", "", "", "", "", ""];
+      playerMoves.X = [];
+      playerMoves.O = [];
+      currentPlayer = "X";
+      isGameActive = true;
+      renderBoard();
+      statusText.innerHTML = `Cat (🐱)'s Turn`;
+      subHint.innerText = "Faded pieces will vanish. Good luck keeping track!";
+      document.getElementById("active-pieces").innerText = `0 / 6`;
+    }
+
+    function resetAll() {
+      scores.X = 0; scores.O = 0;
+      document.getElementById("score-x").innerText = 0;
+      document.getElementById("score-o").innerText = 0;
+      restartGame();
+    }
+
+    function aiTurn() {
+      if (!isGameActive) return;
+      const bestMove = getBestMove();
+      executeTurn(bestMove, "O");
+    }
+
+    function getBestMove() {
+      const emptySpots = board.map((v, i) => v === "" ? i : null).filter(v => v !== null);
+      for (let spot of emptySpots) {
+        const simBoard = [...board]; const simMoves = [...playerMoves.O];
+        if (simMoves.length >= 3) simBoard[simMoves.shift()] = "";
+        simBoard[spot] = "O";
+        if (checkWinner(simBoard)?.player === "O") return spot;
+      }
+      for (let spot of emptySpots) {
+        const simBoard = [...board]; const simMoves = [...playerMoves.X];
+        if (simMoves.length >= 3) simBoard[simMoves.shift()] = "";
+        simBoard[spot] = "X";
+        if (checkWinner(simBoard)?.player === "X") return spot;
+      }
+      if (board[4] === "") return 4;
+      const corners = [0, 2, 6, 8].filter(idx => board[idx] === "");
+      if (corners.length > 0) return corners[Math.floor(Math.random() * corners.length)];
+      return emptySpots[Math.floor(Math.random() * emptySpots.length)];
+    }
+  </script>
+</body>
+</html>
